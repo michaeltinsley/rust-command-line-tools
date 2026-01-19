@@ -1,0 +1,54 @@
+name: Rust CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    # 1. Use the matrix value in the job name for clarity
+    name: Test on ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+
+    # 2. Define the matrix: GitHub will run this job twice in parallel
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+        # ubuntu-latest     = Standard x86_64 (AMD64)
+        # ubuntu-24.04-arm  = Native ARM64 (AArch64)
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Cache keys need to differ by runner/arch to avoid corruption
+          key: ${{ matrix.runner }}
+
+      - name: Check formatting
+        # We only need to check formatting once (on amd64) to save resources
+        if: matrix.runner == 'ubuntu-latest'
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Run Tests
+        run: cargo test --workspace

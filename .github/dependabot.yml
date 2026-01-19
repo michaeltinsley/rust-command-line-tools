@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Keep GitHub Actions workflow actions up-to-date
+  - package-ecosystem: "github-actions"
+    directory: "/.github/workflows"
+    schedule:
+      interval: daily
+  # Keep Rust crates (Cargo) up-to-date
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: daily

@@ -1,0 +1,11 @@
+[package]
+name = "rust-command-lines-tools"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = [
+    "exercises/*"
+]
+
+[dependencies]
