@@ -3,8 +3,7 @@ use std::path::PathBuf;
 
 /// Command-line arguments for the file lister application
 #[derive(Parser, Debug)]
-#[command(name = "file-lister")]
-#[command(author, version, about = "A simple file and directory lister", long_about = None)]
+#[command(name = "file-lister", author, version, about = "A simple file and directory lister", long_about = None)]
 pub struct Args {
     /// Path to the directory to list
     #[arg(default_value = ".")]
