@@ -58,7 +58,7 @@ fn adjust_time(time: SystemTime, seconds: i64) -> Result<SystemTime> {
     if seconds >= 0 {
         Ok(time + std::time::Duration::from_secs(seconds as u64))
     } else {
-        time.checked_sub(std::time::Duration::from_secs((-seconds) as u64))
+        time.checked_sub(std::time::Duration::from_secs(seconds.unsigned_abs()))
             .ok_or_else(|| "Resulting timestamp would be before UNIX epoch".into())
     }
 }
