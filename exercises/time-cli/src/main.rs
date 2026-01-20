@@ -4,8 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// A command line tool that generates timestamps based on the current time
 #[derive(Parser, Debug)]
-#[command(name = "timestamp")]
-#[command(author, version, about, long_about = None)]
+#[command(name = "timestamp", author, version, about, long_about = None)]
 struct Args {
     /// Number of seconds to add to the current time
     #[arg(default_value_t = 0)]
