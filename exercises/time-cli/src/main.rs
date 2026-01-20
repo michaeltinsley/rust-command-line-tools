@@ -36,44 +36,47 @@ impl std::fmt::Display for TimestampFormat {
     }
 }
 
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
 fn main() {
+    if let Err(e) = run() {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<()> {
     let args = Args::parse();
+    let adjusted_time = adjust_time(SystemTime::now(), args.seconds)?;
+    let output = format_timestamp(adjusted_time, args.format)?;
+    println!("{}", output);
+    Ok(())
+}
 
-    // Get the current time using std::time
-    let now = SystemTime::now();
-
-    // Add or subtract the specified number of seconds directly
-    let adjusted_time = if args.seconds >= 0 {
-        now + std::time::Duration::from_secs(args.seconds as u64)
+/// Adjust a SystemTime by adding or subtracting seconds
+fn adjust_time(time: SystemTime, seconds: i64) -> Result<SystemTime> {
+    if seconds >= 0 {
+        Ok(time + std::time::Duration::from_secs(seconds as u64))
     } else {
-        match now.checked_sub(std::time::Duration::from_secs((-args.seconds) as u64)) {
-            Some(time) => time,
-            None => {
-                eprintln!("Error: Resulting timestamp would be before UNIX epoch");
-                std::process::exit(1);
-            }
-        }
-    };
+        time.checked_sub(std::time::Duration::from_secs((-seconds) as u64))
+            .ok_or_else(|| "Resulting timestamp would be before UNIX epoch".into())
+    }
+}
 
-    // Format and print the timestamp based on the requested format
-    match args.format {
+/// Format a SystemTime according to the specified format
+fn format_timestamp(time: SystemTime, format: TimestampFormat) -> Result<String> {
+    match format {
         TimestampFormat::Unix => {
-            let duration = adjusted_time.duration_since(UNIX_EPOCH).unwrap();
-            println!("{}", duration.as_secs());
+            let duration = time.duration_since(UNIX_EPOCH)?;
+            Ok(duration.as_secs().to_string())
         }
-        TimestampFormat::Rfc3339 | TimestampFormat::Default => {
-            // Convert SystemTime to chrono DateTime only for formatting
-            let datetime: DateTime<Utc> = adjusted_time.into();
-
-            match args.format {
-                TimestampFormat::Rfc3339 => {
-                    println!("{}", datetime.to_rfc3339());
-                }
-                TimestampFormat::Default => {
-                    println!("{}", datetime.format("%Y-%m-%d %H:%M:%S"));
-                }
-                _ => unreachable!(),
-            }
+        TimestampFormat::Rfc3339 => {
+            let datetime: DateTime<Utc> = time.into();
+            Ok(datetime.to_rfc3339())
+        }
+        TimestampFormat::Default => {
+            let datetime: DateTime<Utc> = time.into();
+            Ok(datetime.format("%Y-%m-%d %H:%M:%S").to_string())
         }
     }
 }
@@ -83,41 +86,48 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_duration_arithmetic() {
-        // Test that we can add seconds using std::time::Duration
-        let epoch = UNIX_EPOCH;
-        let one_hour_later = epoch + std::time::Duration::from_secs(3600);
-
-        let duration = one_hour_later.duration_since(UNIX_EPOCH).unwrap();
+    fn test_adjust_time_positive() {
+        let result = adjust_time(UNIX_EPOCH, 3600).unwrap();
+        let duration = result.duration_since(UNIX_EPOCH).unwrap();
         assert_eq!(duration.as_secs(), 3600);
     }
 
     #[test]
+    fn test_adjust_time_negative() {
+        let time = UNIX_EPOCH + std::time::Duration::from_secs(7200);
+        let result = adjust_time(time, -3600).unwrap();
+        let duration = result.duration_since(UNIX_EPOCH).unwrap();
+        assert_eq!(duration.as_secs(), 3600);
+    }
+
+    #[test]
+    fn test_format_unix() {
+        let time = UNIX_EPOCH + std::time::Duration::from_secs(1704067200);
+        let result = format_timestamp(time, TimestampFormat::Unix).unwrap();
+        assert_eq!(result, "1704067200");
+    }
+
+    #[test]
+    fn test_format_default() {
+        let time = UNIX_EPOCH + std::time::Duration::from_secs(1704067200);
+        let result = format_timestamp(time, TimestampFormat::Default).unwrap();
+        assert_eq!(result, "2024-01-01 00:00:00");
+    }
+
+    #[test]
+    fn test_format_rfc3339() {
+        let time = UNIX_EPOCH + std::time::Duration::from_secs(1704067200);
+        let result = format_timestamp(time, TimestampFormat::Rfc3339).unwrap();
+        assert!(result.starts_with("2024-01-01T00:00:00"));
+    }
+
+    #[test]
     fn test_systemtime_to_datetime_conversion() {
-        // Test that SystemTime converts correctly to chrono DateTime
         let time = UNIX_EPOCH + std::time::Duration::from_secs(1704067200);
         let datetime: DateTime<Utc> = time.into();
-
         assert_eq!(
             datetime.format("%Y-%m-%d %H:%M:%S").to_string(),
             "2024-01-01 00:00:00"
         );
-    }
-
-    #[test]
-    fn test_epoch_formatting() {
-        let datetime: DateTime<Utc> = UNIX_EPOCH.into();
-        assert_eq!(
-            datetime.format("%Y-%m-%d %H:%M:%S").to_string(),
-            "1970-01-01 00:00:00"
-        );
-    }
-
-    #[test]
-    fn test_rfc3339_formatting() {
-        let time = UNIX_EPOCH + std::time::Duration::from_secs(1704067200);
-        let datetime: DateTime<Utc> = time.into();
-        let rfc3339 = datetime.to_rfc3339();
-        assert!(rfc3339.starts_with("2024-01-01T00:00:00"));
     }
 }
